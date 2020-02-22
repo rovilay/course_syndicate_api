@@ -1,18 +1,17 @@
 package root
 
-import (
-	"course_syndicate_api/pkg"
-)
-
+// MongoConfig ...
 type MongoConfig struct {
-	url    string
+	Url    string
 	DBName string
 }
 
+// ServerConfig ...
 type ServerConfig struct {
-	Port int
+	Port string
 }
 
+// Config ...
 type Config struct {
 	MongoConfig  *MongoConfig
 	ServerConfig *ServerConfig
