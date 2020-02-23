@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	root "github.com/rovilay/course_syndicate_api/pkg"
 	"github.com/rovilay/course_syndicate_api/pkg/db"
 	"github.com/rovilay/course_syndicate_api/pkg/utils"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -22,32 +23,96 @@ func NewUserController(c *mongo.Client, config *root.MongoConfig) *UserControlle
 
 // CreateUserHandler ...
 func (uc *UserController) CreateUserHandler(res http.ResponseWriter, r *http.Request) {
-	var user root.User
+	e := &utils.ErrorWithStatusCode{
+		StatusCode:   http.StatusInternalServerError,
+		ErrorMessage: errors.New("Something went wrong"),
+	}
 
-	err := json.NewDecoder(r.Body).Decode(&user)
+	ctx := r.Context()
+	user := ctx.Value("user").(root.User)
+
 	newUser, err := db.CreateUserModel(&user)
 
 	if err != nil {
 		fmt.Println("[ERROR: CREATE_USER_HANDLER]: ", err)
-		e := &utils.ErrorWithStatusCode{
-			StatusCode:   http.StatusInternalServerError,
-			ErrorMessage: errors.New("Something went wrong"),
-		}
 
 		utils.ErrorHandler(e, res)
+		return
 	}
 
 	col := uc.userService.Collection
 	result, err := col.InsertOne(context.Background(), newUser)
 
 	if err != nil {
-		e := &utils.ErrorWithStatusCode{
-			StatusCode:   http.StatusInternalServerError,
-			ErrorMessage: errors.New("Something went wrong"),
+		fmt.Println("[ERROR: CREATE_USER_HANDLER]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	tp := &utils.TokenPayload{
+		ID:    result.InsertedID.(primitive.ObjectID).Hex(),
+		Email: user.Email,
+	}
+
+	token, err := utils.GenerateToken(tp)
+
+	if err != nil {
+		fmt.Println("[ERROR: CREATE_USER_HANDLER]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	utils.JSONResponseHandler(res, http.StatusCreated, authResponse{token})
+}
+
+// LoginUserHandler ...
+func (uc *UserController) LoginUserHandler(res http.ResponseWriter, r *http.Request) {
+	e := &utils.ErrorWithStatusCode{}
+	ctx := r.Context()
+	u := ctx.Value("user").(root.User)
+	var result *db.UserModel
+
+	col := uc.userService.Collection
+	err := col.FindOne(context.Background(), bson.M{"email": u.Email}).Decode(&result)
+
+	if err != nil {
+		e.StatusCode = http.StatusInternalServerError
+		e.ErrorMessage = errors.New("something went wrong")
+
+		if result == nil {
+			e.StatusCode = http.StatusNotFound
+			e.ErrorMessage = errors.New("user not found")
 		}
 
 		utils.ErrorHandler(e, res)
+		return
 	}
 
-	utils.JSONResponseHandler(res, http.StatusOK, result)
+	if !result.ComparePasswordHash(u.Password) {
+		e.StatusCode = http.StatusBadRequest
+		e.ErrorMessage = errors.New("wrong password")
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	tp := &utils.TokenPayload{
+		ID:    result.ID.Hex(),
+		Email: result.Email,
+	}
+
+	token, err := utils.GenerateToken(tp)
+
+	if err != nil {
+		fmt.Println("[ERROR: CREATE_USER_HANDLER]: ", err)
+		e.StatusCode = http.StatusInternalServerError
+		e.ErrorMessage = errors.New("something went wrong")
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	utils.JSONResponseHandler(res, http.StatusOK, authResponse{token})
 }
