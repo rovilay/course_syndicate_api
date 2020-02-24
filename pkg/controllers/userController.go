@@ -29,7 +29,7 @@ func (uc *UserController) CreateUserHandler(res http.ResponseWriter, r *http.Req
 	}
 
 	ctx := r.Context()
-	user := ctx.Value("user").(root.User)
+	user := ctx.Value(utils.ContextKey("user")).(root.User)
 
 	newUser, err := db.CreateUserModel(&user)
 
@@ -71,13 +71,15 @@ func (uc *UserController) CreateUserHandler(res http.ResponseWriter, r *http.Req
 func (uc *UserController) LoginUserHandler(res http.ResponseWriter, r *http.Request) {
 	e := &utils.ErrorWithStatusCode{}
 	ctx := r.Context()
-	u := ctx.Value("user").(root.User)
+	u := ctx.Value(utils.ContextKey("user")).(root.User)
 	var result *db.UserModel
 
 	col := uc.userService.Collection
 	err := col.FindOne(context.Background(), bson.M{"email": u.Email}).Decode(&result)
 
 	if err != nil {
+		fmt.Println("[ERROR: LoginUserHandler]: ", err)
+
 		e.StatusCode = http.StatusInternalServerError
 		e.ErrorMessage = errors.New("something went wrong")
 
@@ -115,4 +117,9 @@ func (uc *UserController) LoginUserHandler(res http.ResponseWriter, r *http.Requ
 	}
 
 	utils.JSONResponseHandler(res, http.StatusOK, authResponse{token})
+}
+
+// DummyController ...
+func (uc *UserController) DummyController(res http.ResponseWriter, r *http.Request) {
+	utils.JSONResponseHandler(res, http.StatusOK, &root.User{})
 }

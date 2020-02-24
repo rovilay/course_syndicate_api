@@ -12,6 +12,7 @@ import (
 	"github.com/rovilay/course_syndicate_api/pkg/db"
 	"github.com/rovilay/course_syndicate_api/pkg/utils"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -79,15 +80,9 @@ func (v *Validator) ValidateUserRegister(next http.Handler) func(http.ResponseWr
 			col := v.UserService.Collection
 			var foundUser *db.UserModel
 
-			err := col.FindOne(context.Background(), bson.M{"email": user.Email}).Decode(&foundUser)
+			col.FindOne(context.Background(), bson.M{"email": user.Email}).Decode(&foundUser)
 
-			if err != nil {
-				e.StatusCode = http.StatusInternalServerError
-				e.ErrorMessage = errors.New("something went wrong")
-
-				utils.ErrorHandler(e, res)
-				return
-			} else if foundUser != nil {
+			if foundUser != nil {
 				e.StatusCode = http.StatusBadRequest
 				e.ErrorMessage = errors.New("user already exist")
 
@@ -96,7 +91,7 @@ func (v *Validator) ValidateUserRegister(next http.Handler) func(http.ResponseWr
 			}
 
 			ctx := r.Context()
-			ctx = context.WithValue(ctx, "user", user)
+			ctx = context.WithValue(ctx, utils.ContextKey("user"), user)
 
 			r = r.WithContext(ctx)
 			next.ServeHTTP(res, r)
@@ -153,7 +148,7 @@ func (v *Validator) ValidateUserLogin(next http.Handler) func(http.ResponseWrite
 
 		if len(v.Errors) == 0 {
 			ctx := r.Context()
-			ctx = context.WithValue(ctx, "user", u)
+			ctx = context.WithValue(ctx, utils.ContextKey("user"), u)
 
 			r = r.WithContext(ctx)
 			next.ServeHTTP(res, r)
@@ -165,5 +160,36 @@ func (v *Validator) ValidateUserLogin(next http.Handler) func(http.ResponseWrite
 		e.Errors = v.Errors
 
 		utils.ErrorHandler(e, res)
+	}
+}
+
+// ValidateUserExist ...
+func (v *Validator) ValidateUserExist(next http.Handler) func(http.ResponseWriter, *http.Request) {
+	return func(res http.ResponseWriter, r *http.Request) {
+		e := &utils.ErrorWithStatusCode{}
+
+		ctx := r.Context()
+		u := ctx.Value(utils.ContextKey("claims")).(*utils.JWTClaims)
+
+		col := v.UserService.Collection
+		var foundUser *db.UserModel
+
+		objID, _ := primitive.ObjectIDFromHex(u.ID)
+		err := col.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&foundUser)
+
+		if err != nil || foundUser == nil {
+			fmt.Println("[ERROR: ValidateUserExist]: ", err)
+
+			e.StatusCode = http.StatusUnauthorized
+			e.ErrorMessage = errors.New("user does not exist")
+
+			utils.ErrorHandler(e, res)
+			return
+		}
+
+		ctx = context.WithValue(ctx, utils.ContextKey("authUser"), foundUser)
+		r = r.WithContext(ctx)
+		next.ServeHTTP(res, r)
+		return
 	}
 }

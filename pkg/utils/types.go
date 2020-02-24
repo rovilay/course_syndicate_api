@@ -29,3 +29,6 @@ type JWTClaims struct {
 	Email string `json:"email" bson:"email"`
 	jwt.StandardClaims
 }
+
+// ContextKey ...
+type ContextKey string
