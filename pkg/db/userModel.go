@@ -17,17 +17,6 @@ type UserModel struct {
 	PasswordHash string             `json:"password" bson:"password"`
 }
 
-// UserModelIndex ...
-// func UserModelIndex() mgo.Index {
-// 	return mgo.Index{
-// 		Key:        []string{"email"},
-// 		Unique:     true,
-// 		DropDups:   true,
-// 		Background: true,
-// 		Sparse:     true,
-// 	}
-// }
-
 // CreateUserModel ...
 func CreateUserModel(u *root.User) (newUser *UserModel, err error) {
 	newUser = &UserModel{

@@ -8,8 +8,6 @@ type UserController struct {
 }
 
 // UserResponse ...
-type UserResponse struct {
-	FirstName string `json:"firstname"`
-	LastName  string `json:"lastname"`
-	Email     string `json:"email"`
+type authResponse struct {
+	Token string `json:"token,omitempty"`
 }
