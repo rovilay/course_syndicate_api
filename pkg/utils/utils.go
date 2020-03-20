@@ -3,6 +3,8 @@ package utils
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -97,4 +99,18 @@ func DecodeToken(token string) (*JWTClaims, error) {
 	}
 
 	return claims, err
+}
+
+// ReadFile ...
+func ReadFile(filename string) ([]byte, error) {
+	file, err := os.Open(filename)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Successfully Opened " + filename)
+	defer file.Close()
+
+	return ioutil.ReadAll(file)
 }
