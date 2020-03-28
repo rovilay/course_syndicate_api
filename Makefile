@@ -26,7 +26,7 @@ restart: stop before start
   
 # Serve task will run fswatch monitor and performs restart task if any source file changed. Before serving it will execute start task.
 serve: start
-	fswatch -or --event=Updated . | xargs -n1 -I {} make restart
+	fswatch -or --event=Updated cmd/*/*.go pkg/*.go pkg/*/*.go  | xargs -n1 -I {} make restart
   
 # .PHONY is used for reserving tasks words
 .PHONY: start before stop restart serve
