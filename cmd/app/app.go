@@ -20,7 +20,7 @@ type App struct {
 func (a *App) Initialize() {
 	a.config = &root.Config{
 		MongoConfig: &root.MongoConfig{
-			Url:    utils.EnvOrDefaultString("DB_URL", ""),
+			URL:    utils.EnvOrDefaultString("DB_URL", ""),
 			DBName: utils.EnvOrDefaultString("DB_NAME", "course_syndicate"),
 		},
 		ServerConfig: &root.ServerConfig{

@@ -13,13 +13,6 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-// const (
-// 	AuthDatabase   = "course_syndicate"
-// 	AuthUserName   = "rovilay"
-// 	AuthPassword   = "qwertyUp1."
-// 	ReplicaSetName = "ireporter-cluster-shard-0"
-// )
-
 // Session ...
 type Session struct {
 	session *mgo.Session
@@ -32,7 +25,7 @@ type Client struct {
 
 // NewClient ...
 func NewClient(config *root.MongoConfig) (*Client, error) {
-	clientOptions := options.Client().ApplyURI(config.Url)
+	clientOptions := options.Client().ApplyURI(config.URL)
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(context.Background(), clientOptions)
@@ -46,29 +39,7 @@ func NewClient(config *root.MongoConfig) (*Client, error) {
 
 // NewSession ...
 func NewSession(config *root.MongoConfig) (*Session, error) {
-	// MongoDBHosts := []string{
-	// 	"ireporter-cluster-shard-00-00-y4nzl.mongodb.net:27017",
-	// 	"ireporter-cluster-shard-00-01-y4nzl.mongodb.net:27017",
-	// 	"ireporter-cluster-shard-00-02-y4nzl.mongodb.net:27017",
-	// }
-
-	// mongoDBDialInfo := &mgo.DialInfo{
-	// 	Addrs:          MongoDBHosts,
-	// 	Timeout:        60 * time.Second,
-	// 	Database:       AuthDatabase,
-	// 	Username:       AuthUserName,
-	// 	Password:       AuthPassword,
-	// 	ReplicaSetName: ReplicaSetName,
-	// }
-
-	// mongoDBDialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-	// 	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-	// 	return conn, err
-	// }
-
-	// session, err := mgo.DialWithInfo(mongoDBDialInfo)
-
-	session, err := mgo.Dial(config.Url)
+	session, err := mgo.Dial(config.URL)
 	if err != nil {
 		return nil, err
 	}
