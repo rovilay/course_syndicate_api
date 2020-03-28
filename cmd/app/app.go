@@ -3,10 +3,10 @@ package main
 import (
 	"log"
 
-	root "github.com/rovilay/course_syndicate_api/pkg"
-	"github.com/rovilay/course_syndicate_api/pkg/db"
-	"github.com/rovilay/course_syndicate_api/pkg/server"
-	"github.com/rovilay/course_syndicate_api/pkg/utils"
+	root "course_syndicate_api/pkg"
+	"course_syndicate_api/pkg/db"
+	"course_syndicate_api/pkg/server"
+	"course_syndicate_api/pkg/utils"
 )
 
 // App ...

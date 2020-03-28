@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/rovilay/course_syndicate_api/pkg/utils"
+	"course_syndicate_api/pkg/utils"
 )
 
 // Authenticate ...

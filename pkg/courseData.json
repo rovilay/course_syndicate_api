@@ -1,0 +1,17 @@
+{
+    "courses": [
+        {
+            "title": "Understanding social media influence on politics and governance",
+            "numberOfModules": 5,
+            "createdAt": "2020-02-25T00:51:28+00:00",
+            "modules": [
+                {"title": "Module 1: Introduction to Course"}
+            ]
+        },
+        {
+            "title": "Go for beginners",
+            "numberOfModules": 5,
+            "createdAt": "2020-02-25T00:51:28+00:00"
+        }
+    ]
+}

@@ -3,7 +3,8 @@ package db
 import (
 	"time"
 
-	root "github.com/rovilay/course_syndicate_api/pkg"
+	root "course_syndicate_api/pkg"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -15,6 +16,7 @@ type UserModel struct {
 	LastName     string             `json:"lastname" bson:"lastname"`
 	Email        string             `json:"email" bson:"email"`
 	PasswordHash string             `json:"password" bson:"password"`
+	CreatedAt    time.Time          `json:"createdAt" bson:"createdAt"`
 }
 
 // CreateUserModel ...
@@ -24,6 +26,7 @@ func CreateUserModel(u *root.User) (newUser *UserModel, err error) {
 		FirstName: u.FirstName,
 		LastName:  u.LastName,
 		Email:     u.Email,
+		CreatedAt: time.Now(),
 	}
 	err = newUser.SetHashPassword(u.Password)
 
