@@ -2,7 +2,7 @@ package root
 
 // MongoConfig ...
 type MongoConfig struct {
-	Url    string
+	URL    string
 	DBName string
 }
 
