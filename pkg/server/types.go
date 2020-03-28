@@ -1,8 +1,9 @@
 package server
 
 import (
+	root "course_syndicate_api/pkg"
+
 	"github.com/gorilla/mux"
-	root "github.com/rovilay/course_syndicate_api/pkg"
 )
 
 // Server ...

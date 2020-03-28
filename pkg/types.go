@@ -19,5 +19,7 @@ type Course struct {
 
 // CourseModule ...
 type CourseModule struct {
-	Title string `json:"title"`
+	Title     string    `json:"title"`
+	CourseID  int64     `json:"courseId"`
+	CreatedAt time.Time `json:"createdAt"`
 }

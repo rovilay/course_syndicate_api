@@ -3,10 +3,11 @@ package server
 import (
 	"net/http"
 
+	root "course_syndicate_api/pkg"
+	"course_syndicate_api/pkg/controllers"
+	middlewares "course_syndicate_api/pkg/middlewares"
+
 	"github.com/gorilla/mux"
-	root "github.com/rovilay/course_syndicate_api/pkg"
-	"github.com/rovilay/course_syndicate_api/pkg/controllers"
-	middlewares "github.com/rovilay/course_syndicate_api/pkg/middlewares"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	root "github.com/rovilay/course_syndicate_api/pkg"
+	root "course_syndicate_api/pkg"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 

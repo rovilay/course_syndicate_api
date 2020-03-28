@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"os"
 
+	root "course_syndicate_api/pkg"
+	"course_syndicate_api/pkg/db"
+	"course_syndicate_api/pkg/utils"
+
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	root "github.com/rovilay/course_syndicate_api/pkg"
-	"github.com/rovilay/course_syndicate_api/pkg/db"
-	"github.com/rovilay/course_syndicate_api/pkg/utils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -32,6 +33,7 @@ func InitServer(config *root.Config, c *db.Client) *Server {
 func (s *Server) InitRouters(client *mongo.Client, config *root.MongoConfig) {
 	s.route.HandleFunc("/", welcomeHandler)
 	NewUserRouter(s.route, client, config)
+	NewCourseRouter(s.route, client, config)
 }
 
 func welcomeHandler(res http.ResponseWriter, r *http.Request) {

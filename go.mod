@@ -1,4 +1,4 @@
-module github.com/rovilay/course_syndicate_api
+module course_syndicate_api
 
 go 1.12
 
@@ -7,7 +7,8 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/joho/godotenv v1.3.0
-	go.mongodb.org/mongo-driver v1.3.0
-	golang.org/x/crypto v0.0.0-20200221170553-0f24fbd83dfb
+	github.com/rovilay/course_syndicate_api v0.0.0-20200224171054-1b1fb7f3eab8
+	go.mongodb.org/mongo-driver v1.3.1
+	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 )

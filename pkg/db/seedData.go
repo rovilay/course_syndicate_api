@@ -1,44 +1,51 @@
 package db
 
 import (
-	"time"
-
-	root "github.com/rovilay/course_syndicate_api/pkg"
+	root "course_syndicate_api/pkg"
 )
 
 // CourseA ...
 var CourseA = &root.Course{
 	Title:           "Understanding social media influence on politics and governance",
-	NumberOfModules: 5,
-	CreatedAt:       time.Now(),
+	NumberOfModules: 3,
 }
 
 // CourseB ...
 var CourseB = &root.Course{
 	Title:           "Go for beginners",
-	NumberOfModules: 5,
-	CreatedAt:       time.Now(),
+	NumberOfModules: 2,
 }
 
-// CourseA Modules
+// CourseAModule1 ...
 var CourseAModule1 = &root.CourseModule{
-	Title: "Module 1: Introduction to Course"
+	Title: "Module 1: Introduction to Social Media",
 }
-var CourseAModule1 = &root.CourseModule{
-	Title: "Module 1: Introduction to Course"
+
+// CourseAModule2 ...
+var CourseAModule2 = &root.CourseModule{
+	Title: "Module 2: A Breif History of Social Media",
 }
-var CourseAModule1 = &root.CourseModule{
-	Title: "Module 1: Introduction to Course"
+
+// CourseAModule3 ...
+var CourseAModule3 = &root.CourseModule{
+	Title: "Module 3: Social Media, Politics and Goverment",
 }
-var CourseAModule1 = &root.CourseModule{
-	Title: "Module 1: Introduction to Course"
+
+// CourseAModule4 ...
+var CourseAModule4 = &root.CourseModule{
+	Title: "Module 1: Introduction to this Go Course",
 }
-var CourseAModule1 = &root.CourseModule{
-	Title: "Module 1: Introduction to Course"
+
+// CourseAModule5 ...
+var CourseAModule5 = &root.CourseModule{
+	Title: "Module 2: Datatypes in Go",
 }
 
 // Courses ...
-var Courses = []*root.Course{CourseA, CourseA}
+var Courses = []*root.Course{CourseA, CourseB}
 
-// CourseModules ...
-var CourseModules = []*root.CourseModule{}
+// CourseAModules ...
+var CourseAModules = []*root.CourseModule{CourseAModule1, CourseAModule2, CourseAModule3}
+
+// CourseBModules ...
+var CourseBModules = []*root.CourseModule{CourseAModule4, CourseAModule5}
