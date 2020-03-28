@@ -194,3 +194,29 @@ func (v *Validator) ValidateUserExist(next http.Handler) func(http.ResponseWrite
 		return
 	}
 }
+
+// ValidateSchedule ...
+func (v *Validator) ValidateSchedule(next http.Handler) func(http.ResponseWriter, *http.Request) {
+	return func(res http.ResponseWriter, r *http.Request) {
+		v.Errors = make(map[string]string)
+		e := &utils.ErrorWithStatusCode{}
+		var cs root.CourseShedule
+
+		if r.Body == nil {
+			e.StatusCode = http.StatusBadRequest
+			e.ErrorMessage = errors.New("no request body")
+
+			utils.ErrorHandler(e, res)
+			return
+		}
+
+		re := regexp.MustCompile("^(every)[ ](0?[1-9]([0-9]{1,})?)[ ]((day|week|month)s?)$")
+
+		if !re.MatchString(cs.Schedule) {
+			v.Errors["email"] = "email is invalid"
+		}
+
+		next.ServeHTTP(res, r)
+		return
+	}
+}
