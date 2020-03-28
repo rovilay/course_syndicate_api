@@ -28,4 +28,9 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 		"",
 		middlewares.Authenticate(http.HandlerFunc(courseController.FetchCourses)),
 	).Methods("GET")
+
+	courseSubrouter.HandleFunc(
+		"/{id}",
+		middlewares.Authenticate(http.HandlerFunc(courseController.FetchSingleCourse)),
+	).Methods("GET")
 }
