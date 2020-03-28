@@ -11,10 +11,10 @@ import (
 	"course_syndicate_api/pkg/db"
 	"course_syndicate_api/pkg/utils"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/mgo.v2/bson"
 )
 
 // NewCourseController ...
