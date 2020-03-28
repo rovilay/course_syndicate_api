@@ -11,6 +11,7 @@ import (
 	"course_syndicate_api/pkg/db"
 	"course_syndicate_api/pkg/utils"
 
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -97,7 +98,6 @@ func (cc *CourseController) FetchCourses(res http.ResponseWriter, r *http.Reques
 	}
 
 	for cur.Next(ctx) {
-
 		// create a value into which the single document can be decoded
 		var c db.CourseModel
 		err := cur.Decode(&c)
@@ -119,4 +119,84 @@ func (cc *CourseController) FetchCourses(res http.ResponseWriter, r *http.Reques
 	// Close the cursor once finished
 	cur.Close(ctx)
 	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", results})
+}
+
+// FetchSingleCourse ...
+func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.Request) {
+	e := &utils.ErrorWithStatusCode{
+		StatusCode:   http.StatusInternalServerError,
+		ErrorMessage: errors.New("fetch failed"),
+	}
+
+	params := mux.Vars(r)
+	courseID, err := primitive.ObjectIDFromHex(params["id"])
+
+	if err != nil {
+		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
+
+		e.StatusCode = http.StatusBadRequest
+		e.ErrorMessage = errors.New("invalid course id")
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	ctx := context.Background()
+	col := cc.courseService.Collection
+	var c *db.CourseModel
+
+	err = col.FindOne(ctx, bson.M{"_id": courseID}).Decode(&c)
+	if err != nil {
+		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
+
+		e.StatusCode = http.StatusInternalServerError
+		e.ErrorMessage = errors.New("something went wrong")
+
+		if c == nil {
+			e.StatusCode = http.StatusNotFound
+			e.ErrorMessage = errors.New("course not found")
+		}
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	// find course modules
+	mCol := cc.courseModuleService.Collection
+	var modules []*db.CourseModuleModel
+
+	cur, err := mCol.Find(ctx, bson.M{"courseId": c.ID})
+	if err := cur.Err(); err != nil {
+		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	for cur.Next(ctx) {
+		// create a value into which the single document can be decoded
+		var cm db.CourseModuleModel
+		err := cur.Decode(&cm)
+		if err != nil {
+			e.StatusCode = http.StatusInternalServerError
+			e.ErrorMessage = errors.New("something went wrong")
+
+			utils.ErrorHandler(e, res)
+			log.Fatalln("[ERROR: FETCH_COURSES]: ", err)
+		}
+
+		modules = append(modules, &cm)
+	}
+
+	result := &courseWithModule{
+		ID:              c.ID,
+		Title:           c.Title,
+		NumberOfModules: c.NumberOfModules,
+		Modules:         modules,
+		CreatedAt:       c.CreatedAt,
+	}
+
+	// Close the cursor once finished
+	cur.Close(ctx)
+	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &result})
 }

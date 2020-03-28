@@ -1,6 +1,12 @@
 package controllers
 
-import "course_syndicate_api/pkg/db"
+import (
+	"time"
+
+	"course_syndicate_api/pkg/db"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // UserController ...
 type UserController struct {
@@ -11,6 +17,15 @@ type UserController struct {
 type CourseController struct {
 	courseService       *db.Service
 	courseModuleService *db.Service
+}
+
+// CourseWithModule ...
+type courseWithModule struct {
+	ID              primitive.ObjectID      `json:"_id,omitempty" bson:"_id, omitempty"`
+	Title           string                  `json:"title" bson:"title"`
+	NumberOfModules int                     `json:"numberOfModules" bson:"numberOfModules"`
+	Modules         []*db.CourseModuleModel `json:"modules"`
+	CreatedAt       time.Time               `json:"createdAt" bson:"createdAt"`
 }
 
 // authResponse ...
