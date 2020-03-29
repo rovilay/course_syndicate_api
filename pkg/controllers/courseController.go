@@ -22,8 +22,9 @@ import (
 func NewCourseController(c *mongo.Client, config *root.MongoConfig) *CourseController {
 	courseService := db.NewService(c, config, "courses")
 	courseModuleService := db.NewService(c, config, "course_modules")
+	courseSubscriptionService := db.NewService(c, config, "course_subscriptions")
 
-	return &CourseController{courseService, courseModuleService}
+	return &CourseController{courseService, courseModuleService, courseSubscriptionService}
 }
 
 // SeedCoursesData ...
@@ -121,7 +122,7 @@ func (cc *CourseController) FetchCourses(res http.ResponseWriter, r *http.Reques
 	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", results})
 }
 
-// FetchSingleCourse ...
+// FetchSingleCourse ....
 func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.Request) {
 	e := &utils.ErrorWithStatusCode{
 		StatusCode:   http.StatusInternalServerError,
@@ -199,4 +200,46 @@ func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.R
 	// Close the cursor once finished
 	cur.Close(ctx)
 	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &result})
+}
+
+// Subscribe ...
+func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) {
+	e := &utils.ErrorWithStatusCode{
+		StatusCode:   http.StatusInternalServerError,
+		ErrorMessage: errors.New("Something went wrong"),
+	}
+
+	ctx := r.Context()
+	u := ctx.Value(utils.ContextKey("claims")).(utils.JWTClaims)
+	c := ctx.Value(utils.ContextKey("verifiedCourse")).(db.CourseModel)
+	cs := ctx.Value(utils.ContextKey("verifiedSchedule")).([]int64)
+
+	uid, err := primitive.ObjectIDFromHex(u.ID)
+	if err != nil {
+		fmt.Println("[ERROR: COURSE_SUBSCRIPTION_HANDLER]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	newSubscription := db.CreateCourseSubscriptionModel(uid, c.ID, cs)
+
+	col := cc.courseSubscriptionService.Collection
+	s, err := col.InsertOne(context.Background(), newSubscription)
+	if err != nil {
+		fmt.Println("[ERROR: COURSE_SUBSCRIPTION_HANDLER]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	result := &courseSubscription{
+		ID:        s.InsertedID.(primitive.ObjectID).Hex(),
+		UserID:    u.ID,
+		CourseID:  c.ID.Hex(),
+		Schedule:  cs,
+		CreatedAt: c.CreatedAt,
+	}
+
+	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", result})
 }

@@ -18,6 +18,7 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 
 	// attach handlers to subrouter
 	courseController := controllers.NewCourseController(c, config)
+	v := middlewares.NewValidator(c, config)
 
 	courseSubrouter.HandleFunc(
 		"/seed",
@@ -33,4 +34,15 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 		"/{id}",
 		middlewares.Authenticate(http.HandlerFunc(courseController.FetchSingleCourse)),
 	).Methods("GET")
+
+	courseSubrouter.HandleFunc(
+		"/{id}/subscribe",
+		middlewares.Authenticate(
+			http.HandlerFunc(
+				v.ValidateCourseSubscription(
+					http.HandlerFunc(courseController.Subscribe),
+				),
+			),
+		),
+	).Methods("POST")
 }

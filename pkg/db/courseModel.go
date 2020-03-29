@@ -24,6 +24,16 @@ type CourseModuleModel struct {
 	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
 }
 
+// CourseSubscriptionModel ...
+type CourseSubscriptionModel struct {
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id, omitempty"`
+	UserID    primitive.ObjectID `json:"userId" bson:"userId"`
+	CourseID  primitive.ObjectID `json:"courseId" bson:"courseId"`
+	Schedule  []int64            `json:"schedule" bson:"schedule"`
+	Completed int                `json:"completed" bson:"completed"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
+}
+
 // CreateCourseModel ...
 func CreateCourseModel(c *root.Course) *CourseModel {
 	newCourse := &CourseModel{
@@ -46,4 +56,18 @@ func CreateCourseModuleModel(cid primitive.ObjectID, cm *root.CourseModule) *Cou
 	}
 
 	return newCourseModule
+}
+
+// CreateCourseSubscriptionModel ...
+func CreateCourseSubscriptionModel(uid, cid primitive.ObjectID, cs []int64) *CourseSubscriptionModel {
+	newCourseSubscription := &CourseSubscriptionModel{
+		ID:        primitive.NewObjectIDFromTimestamp(time.Now()),
+		UserID:    uid,
+		CourseID:  cid,
+		Schedule:  cs,
+		Completed: 0,
+		CreatedAt: time.Now(),
+	}
+
+	return newCourseSubscription
 }

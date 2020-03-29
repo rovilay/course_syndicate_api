@@ -15,17 +15,26 @@ type UserController struct {
 
 // CourseController ...
 type CourseController struct {
-	courseService       *db.Service
-	courseModuleService *db.Service
+	courseService             *db.Service
+	courseModuleService       *db.Service
+	courseSubscriptionService *db.Service
 }
 
-// CourseWithModule ...
 type courseWithModule struct {
 	ID              primitive.ObjectID      `json:"_id,omitempty" bson:"_id, omitempty"`
 	Title           string                  `json:"title" bson:"title"`
 	NumberOfModules int                     `json:"numberOfModules" bson:"numberOfModules"`
 	Modules         []*db.CourseModuleModel `json:"modules"`
 	CreatedAt       time.Time               `json:"createdAt" bson:"createdAt"`
+}
+
+type courseSubscription struct {
+	ID        string    `json:"_id,omitempty" bson:"_id, omitempty"`
+	UserID    string    `json:"userId" bson:"userId"`
+	CourseID  string    `json:"courseId" bson:"courseId"`
+	Schedule  []int64   `json:"schedule" bson:"schedule"`
+	Completed int       `json:"completed" bson:"completed"`
+	CreatedAt time.Time `json:"createdAt" bson:"createdAt"`
 }
 
 // authResponse ...

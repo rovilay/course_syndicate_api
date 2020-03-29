@@ -32,7 +32,7 @@ func Authenticate(next http.Handler) func(http.ResponseWriter, *http.Request) {
 		}
 
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, utils.ContextKey("claims"), claims)
+		ctx = context.WithValue(ctx, utils.ContextKey("claims"), *claims)
 
 		r = r.WithContext(ctx)
 		next.ServeHTTP(res, r)
