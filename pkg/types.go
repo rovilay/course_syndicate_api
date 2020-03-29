@@ -23,3 +23,15 @@ type CourseModule struct {
 	CourseID  string    `json:"courseId"`
 	CreatedAt time.Time `json:"createdAt"`
 }
+
+// CourseShedule ...
+type CourseShedulePayload struct {
+	Schedule string `json:"schedule"`
+}
+
+// CourseShedule ...
+type CourseShedule struct {
+	CourseID  string    `json:"courseId"`
+	Schedule  string    `json:"schedule"`
+	CreatedAt time.Time `json:"createdAt"`
+}

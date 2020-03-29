@@ -57,7 +57,6 @@ func (uc *UserController) CreateUserHandler(res http.ResponseWriter, r *http.Req
 	}
 
 	token, err := utils.GenerateToken(tp)
-
 	if err != nil {
 		fmt.Println("[ERROR: CREATE_USER_HANDLER]: ", err)
 

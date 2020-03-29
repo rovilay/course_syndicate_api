@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -101,16 +102,102 @@ func DecodeToken(token string) (*JWTClaims, error) {
 	return claims, err
 }
 
-// ReadFile ...
-func ReadFile(filename string) ([]byte, error) {
-	file, err := os.Open(filename)
+// Schedular ...
+func Schedular(s, dateFormat string, numberOfSchedule int) (ts []int64, err error) {
+	re := regexp.MustCompile("^(every)[ ](0?[1-9]([0-9]{1,})?)[ ]((day|week|month)s?)$")
 
-	if err != nil {
-		return nil, err
+	if re.MatchString(s) {
+		return TimeframeSchedular(s, numberOfSchedule)
 	}
 
-	fmt.Println("Successfully Opened " + filename)
-	defer file.Close()
+	return DateTimeStringSchedular(s, dateFormat)
+}
 
-	return ioutil.ReadAll(file)
+// TimeframeSchedular ...
+func TimeframeSchedular(s string, numberOfSchedule int) ([]int64, error) {
+	var ts []int64
+	re := regexp.MustCompile("^(every)[ ](0?[1-9]([0-9]{1,})?)[ ]((day|week|month)s?)$")
+
+	if !re.MatchString(s) {
+		err := errors.New("invalid string")
+		return ts, err
+	}
+
+	sArr := strings.Split(strings.ToLower(s), " ")
+
+	scheduleNumber, err := strconv.Atoi(sArr[1])
+	if err != nil {
+		return ts, err
+	}
+
+	const oneMillisecInNanosec = 1e6
+	now := time.Now()
+	for num := 0; num < numberOfSchedule; num++ {
+		if num == 0 {
+			// convert date to milliseconds
+			tMilliSec := now.UnixNano() / oneMillisecInNanosec
+			ts = append(ts, tMilliSec)
+			continue
+		}
+
+		if sArr[2] == "month" || sArr[2] == "months" {
+			// convert date to milliseconds
+			tMilliSec := now.AddDate(0, scheduleNumber, 0).UnixNano() / oneMillisecInNanosec
+			ts = append(ts, tMilliSec)
+			continue
+		}
+
+		var hours string
+		numOfHoursInADay := 24
+
+		if sArr[2] == "day" || sArr[2] == "days" {
+			hours = fmt.Sprintf("%dh", numOfHoursInADay*scheduleNumber*num)
+		} else if sArr[2] == "week" || sArr[2] == "weeks" {
+			numOfDaysInAWeek := 7
+			hours = fmt.Sprintf("%dh", numOfHoursInADay*numOfDaysInAWeek*scheduleNumber*num)
+		}
+
+		duration, err := time.ParseDuration(hours)
+		if err != nil {
+			return ts, err
+		}
+
+		// convert date to milliseconds
+		tMilliSec := now.Add(duration).UnixNano() / oneMillisecInNanosec
+		ts = append(ts, tMilliSec)
+	}
+
+	return ts, err
+}
+
+// DateTimeStringSchedular ...
+func DateTimeStringSchedular(s, dateFormat string) ([]int64, error) {
+	var ts []int64
+
+	sArr := strings.Split(s, ",")
+
+	if len(sArr) < 1 {
+		return ts, fmt.Errorf("invalid string")
+	}
+
+	for _, val := range sArr {
+		t, err := time.Parse(dateFormat, val)
+		if err != nil {
+			return ts, fmt.Errorf("invalid string")
+		}
+
+		const oneMillisecInNanosec = 1e6
+		// convert date to milliseconds
+		tMillisec := t.UnixNano() / oneMillisecInNanosec
+		nowMillisec := time.Now().UnixNano() / oneMillisecInNanosec
+
+		// check if time has expired
+		if (tMillisec - nowMillisec) < 0 {
+			return ts, errors.New("time has expired")
+		}
+
+		ts = append(ts, tMillisec)
+	}
+
+	return ts, nil
 }
