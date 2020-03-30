@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	root "course_syndicate_api/pkg"
 	"course_syndicate_api/pkg/db"
@@ -22,9 +24,19 @@ import (
 func NewCourseController(c *mongo.Client, config *root.MongoConfig) *CourseController {
 	courseService := db.NewService(c, config, "courses")
 	courseModuleService := db.NewService(c, config, "course_modules")
-	courseSubscriptionService := db.NewService(c, config, "course_subscriptions")
+	courseSubscriptionService := db.NewCourseSubService(c, config)
+	subscriptionScheduleService := db.NewService(c, config, "subscription_schedules")
+	host := utils.EnvOrDefaultString("SMTP_HOST", "smtp.gmail.com")
+	port := utils.EnvOrDefaultString("SMTP_PORT", "587")
+	smptService := &utils.SMTPServer{Host: host, Port: port}
 
-	return &CourseController{courseService, courseModuleService, courseSubscriptionService}
+	return &CourseController{
+		courseService,
+		courseModuleService,
+		courseSubscriptionService,
+		subscriptionScheduleService,
+		smptService,
+	}
 }
 
 // SeedCoursesData ...
@@ -144,62 +156,36 @@ func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.R
 
 	ctx := context.Background()
 	col := cc.courseService.Collection
-	var c *db.CourseModel
 
-	err = col.FindOne(ctx, bson.M{"_id": courseID}).Decode(&c)
+	matchStage := bson.M{"$match": bson.M{"_id": courseID}}
+	lookupStage := bson.M{"$lookup": bson.M{
+		"from":         "course_modules",
+		"localField":   "_id",
+		"foreignField": "courseId",
+		"as":           "modules",
+	}}
+
+	cur, err := col.Aggregate(ctx, []bson.M{matchStage, lookupStage})
 	if err != nil {
 		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
 
 		e.StatusCode = http.StatusInternalServerError
 		e.ErrorMessage = errors.New("something went wrong")
 
-		if c == nil {
-			e.StatusCode = http.StatusNotFound
-			e.ErrorMessage = errors.New("course not found")
-		}
-
 		utils.ErrorHandler(e, res)
 		return
 	}
 
-	// find course modules
-	mCol := cc.courseModuleService.Collection
-	var modules []*db.CourseModuleModel
-
-	cur, err := mCol.Find(ctx, bson.M{"courseId": c.ID})
-	if err := cur.Err(); err != nil {
+	var cwm []db.CourseWithModule
+	if err = cur.All(ctx, &cwm); err != nil {
 		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
 
 		utils.ErrorHandler(e, res)
 		return
 	}
 
-	for cur.Next(ctx) {
-		// create a value into which the single document can be decoded
-		var cm db.CourseModuleModel
-		err := cur.Decode(&cm)
-		if err != nil {
-			e.StatusCode = http.StatusInternalServerError
-			e.ErrorMessage = errors.New("something went wrong")
-
-			utils.ErrorHandler(e, res)
-			log.Fatalln("[ERROR: FETCH_COURSES]: ", err)
-		}
-
-		modules = append(modules, &cm)
-	}
-
-	result := &courseWithModule{
-		ID:              c.ID,
-		Title:           c.Title,
-		NumberOfModules: c.NumberOfModules,
-		Modules:         modules,
-		CreatedAt:       c.CreatedAt,
-	}
-
-	// Close the cursor once finished
 	cur.Close(ctx)
-	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &result})
+	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &cwm[0]})
 }
 
 // Subscribe ...
@@ -224,6 +210,7 @@ func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) 
 
 	newSubscription := db.CreateCourseSubscriptionModel(uid, c.ID, cs)
 
+	// create subscription
 	col := cc.courseSubscriptionService.Collection
 	s, err := col.InsertOne(context.Background(), newSubscription)
 	if err != nil {
@@ -233,13 +220,149 @@ func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	schedules := []interface{}{}
+	for _, schedule := range cs {
+		ns := db.CreateSubscriptionScheduleModel(newSubscription.ID, schedule)
+		schedules = append(schedules, *ns)
+	}
+
+	// create schedules
+	ssCol := cc.subscriptionScheduleService.Collection
+	_, err = ssCol.InsertMany(context.Background(), schedules)
+	if err != nil {
+		fmt.Println("[ERROR: COURSE_SUBSCRIPTION_HANDLER]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
 	result := &courseSubscription{
-		ID:        s.InsertedID.(primitive.ObjectID).Hex(),
-		UserID:    u.ID,
-		CourseID:  c.ID.Hex(),
-		Schedule:  cs,
-		CreatedAt: c.CreatedAt,
+		ID:               s.InsertedID.(primitive.ObjectID).Hex(),
+		UserID:           u.ID,
+		CourseID:         c.ID.Hex(),
+		ModulesCompleted: newSubscription.ModulesCompleted,
+		Schedule:         cs,
+		CreatedAt:        c.CreatedAt,
 	}
 
 	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", result})
+}
+
+// FetchSubscriptions ...
+func (cc *CourseController) FetchSubscriptions(res http.ResponseWriter, r *http.Request) {
+	e := &utils.ErrorWithStatusCode{
+		StatusCode:   http.StatusInternalServerError,
+		ErrorMessage: errors.New("fetch failed"),
+	}
+
+	const oneMillisecInNanosec = 1e6
+	const oneSecInMilliSec = 1000
+	now := time.Now().UnixNano() / oneMillisecInNanosec
+	sendMailIntervalMins, err := strconv.Atoi(utils.EnvOrDefaultString("SEND_MAIL_INTERVAL_MINS", "15"))
+	if err != nil {
+		sendMailIntervalMins = 15
+	}
+	interval := sendMailIntervalMins * 60 * oneSecInMilliSec
+
+	ctx := context.Background()
+	col := cc.subscriptionScheduleService.Collection
+
+	addFieldStage := bson.M{"$addFields": bson.M{
+		"timeDiff": bson.M{"$subtract": []interface{}{now, "$schedule"}},
+		"isMailReady": bson.M{"$and": []bson.M{
+			bson.M{"$gte": []interface{}{"$timeDiff", 0}},
+			bson.M{"$lte": []interface{}{"$timeDiff", interval}},
+		}},
+	}}
+	matchStage := bson.M{"$match": bson.M{"isMailReady": false, "completed": false}}
+	lookupStage1 := bson.M{"$lookup": bson.M{
+		"from":         "course_subscriptions",
+		"localField":   "subscriptionId",
+		"foreignField": "_id",
+		"as":           "subscription",
+	}}
+	unwindStage1 := bson.M{"$unwind": bson.M{
+		"path":                       "$subscription",
+		"preserveNullAndEmptyArrays": true,
+	}}
+	lookupStage2 := bson.M{"$lookup": bson.M{
+		"from":         "users",
+		"localField":   "subscription.userId",
+		"foreignField": "_id",
+		"as":           "user",
+	}}
+	unwindStage2 := bson.M{"$unwind": bson.M{
+		"path":                       "$user",
+		"preserveNullAndEmptyArrays": true,
+	}}
+	lookupStage3 := bson.M{"$lookup": bson.M{
+		"from":         "courses",
+		"localField":   "subscription.courseId",
+		"foreignField": "_id",
+		"as":           "course",
+	}}
+	unwindStage3 := bson.M{"$unwind": bson.M{
+		"path":                       "$course",
+		"preserveNullAndEmptyArrays": true,
+	}}
+	lookupStage4 := bson.M{"$lookup": bson.M{
+		"from":         "course_modules",
+		"localField":   "subscription.courseId",
+		"foreignField": "courseId",
+		"as":           "courseModules",
+	}}
+	project := bson.M{"$project": bson.M{
+		"subscriptionId":        0,
+		"subscription.userId":   0,
+		"subscription.courseId": 0,
+		"user._id":              0,
+		"user.password":         0,
+		"user.createdAt":        0,
+	}}
+
+	cur, err := col.Aggregate(ctx, []bson.M{
+		addFieldStage,
+		matchStage,
+		lookupStage1,
+		unwindStage1,
+		lookupStage2,
+		unwindStage2,
+		lookupStage3,
+		unwindStage3,
+		lookupStage4,
+		project,
+	})
+	if err != nil {
+		fmt.Println("[ERROR: FETCH_SUBS]: ", err)
+
+		e.StatusCode = http.StatusInternalServerError
+		e.ErrorMessage = errors.New("something went wrong")
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	var subs []fetchSchedulesResult
+	if err = cur.All(ctx, &subs); err != nil {
+		fmt.Println("[ERROR: FETCH_SUBS]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	cur.Close(ctx)
+	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &subs})
+}
+
+// MailCourse ...
+func (cc *CourseController) MailCourse(emails []string, messages [][]byte) {
+	from := utils.EnvOrDefaultString("SMTP_EMAIL", "")
+	password := utils.EnvOrDefaultString("SMTP_EMAIL_PASSWORD", "")
+
+	for i, email := range emails {
+		err := cc.smtpService.SendMail(from, password, []string{email}, messages[i])
+		if err != nil {
+			panic(err)
+		}
+	}
 }

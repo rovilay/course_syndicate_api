@@ -22,11 +22,13 @@ import (
 func NewValidator(c *mongo.Client, config *root.MongoConfig) *Validator {
 	us := db.NewUserService(c, config)
 	cs := db.NewService(c, config, "courses")
+	css := db.NewCourseSubService(c, config)
 
 	return &Validator{
-		UserService:   us,
-		CourseService: cs,
-		Errors:        make(map[string]string),
+		userService:               us,
+		courseService:             cs,
+		courseSubscriptionService: css,
+		Errors:                    make(map[string]string),
 	}
 }
 
@@ -81,7 +83,7 @@ func (v *Validator) ValidateUserRegister(next http.Handler) func(http.ResponseWr
 
 		if len(v.Errors) == 0 {
 			// check if user already exist
-			col := v.UserService.Collection
+			col := v.userService.Collection
 			var foundUser *db.UserModel
 
 			col.FindOne(context.Background(), bson.M{"email": user.Email}).Decode(&foundUser)
@@ -175,7 +177,7 @@ func (v *Validator) ValidateUserExist(next http.Handler) func(http.ResponseWrite
 		ctx := r.Context()
 		u := ctx.Value(utils.ContextKey("claims")).(*utils.JWTClaims)
 
-		col := v.UserService.Collection
+		col := v.userService.Collection
 		var foundUser *db.UserModel
 
 		objID, _ := primitive.ObjectIDFromHex(u.ID)
@@ -201,7 +203,7 @@ func (v *Validator) ValidateUserExist(next http.Handler) func(http.ResponseWrite
 // CheckCourseExist ...
 func (v *Validator) CheckCourseExist(courseID primitive.ObjectID) (c *db.CourseModel, err error) {
 	ctx := context.Background()
-	col := v.CourseService.Collection
+	col := v.courseService.Collection
 
 	err = col.FindOne(ctx, bson.M{"_id": courseID}).Decode(&c)
 	if err != nil {
@@ -211,6 +213,22 @@ func (v *Validator) CheckCourseExist(courseID primitive.ObjectID) (c *db.CourseM
 		if c == nil {
 			err = errors.New("course not found")
 		}
+
+		return
+	}
+
+	return
+}
+
+// CheckSubscriptionExist ...
+func (v *Validator) CheckSubscriptionExist(userID, courseID primitive.ObjectID) (csm *db.CourseSubscriptionModel, err error) {
+	ctx := context.Background()
+	col := v.courseSubscriptionService.Collection
+
+	err = col.FindOne(ctx, bson.M{"userId": userID, "courseId": courseID}).Decode(&csm)
+	if err != nil {
+		fmt.Println("[ERROR: ValidateCourseExist]: ", err)
+		err = errors.New("something went wrong")
 
 		return
 	}
@@ -293,6 +311,21 @@ func (v *Validator) ValidateCourseSubscription(next http.Handler) func(http.Resp
 			return
 		}
 
+		// check if subscription exist
+		ctx := r.Context()
+		u := ctx.Value(utils.ContextKey("claims")).(utils.JWTClaims)
+		uid, _ := primitive.ObjectIDFromHex(u.ID)
+
+		csm, _ := v.CheckSubscriptionExist(uid, courseID)
+
+		if csm != nil {
+			e.StatusCode = http.StatusBadRequest
+			e.ErrorMessage = errors.New("you have already subscribed to this course")
+
+			utils.ErrorHandler(e, res)
+			return
+		}
+
 		// Validate Schedule payload and create Schedule
 		var cs root.CourseShedulePayload
 		err = json.NewDecoder(r.Body).Decode(&cs)
@@ -326,7 +359,6 @@ func (v *Validator) ValidateCourseSubscription(next http.Handler) func(http.Resp
 			return
 		}
 
-		ctx := r.Context()
 		ctx = context.WithValue(ctx, utils.ContextKey("verifiedCourse"), *c)
 		ctx = context.WithValue(ctx, utils.ContextKey("verifiedSchedule"), ts)
 

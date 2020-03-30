@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"regexp"
 	"strconv"
@@ -200,4 +201,17 @@ func DateTimeStringSchedular(s, dateFormat string) ([]int64, error) {
 	}
 
 	return ts, nil
+}
+
+// Address URI to smtp server
+func (s *SMTPServer) Address() string {
+	return s.Host + ":" + s.Port
+}
+
+// SendMail ...
+func (s *SMTPServer) SendMail(from, password string, to []string, message []byte) error {
+	// Authentication.
+	auth := smtp.PlainAuth("", from, password, s.Host)
+	// Sending email.
+	return smtp.SendMail(s.Address(), auth, from, to, message)
 }

@@ -45,4 +45,13 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 			),
 		),
 	).Methods("POST")
+
+	courseSubrouter.HandleFunc(
+		"/{id}/subscribe",
+		middlewares.Authenticate(
+			http.HandlerFunc(
+				http.HandlerFunc(courseController.FetchSubscriptions),
+			),
+		),
+	).Methods("GET")
 }
