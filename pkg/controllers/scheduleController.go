@@ -157,7 +157,7 @@ func (sc *ScheduleController) processSchedule(sender, password string, sch fetch
 	}
 
 	module := sch.CourseModules[sch.Subscription.ModulesCompleted]
-	ml := fmt.Sprintf("localhost:4444/api/v1/courses/%s/modules/%s", sch.Course.ID.Hex(), module.ID.Hex())
+	ml := fmt.Sprintf("http://localhost:4444/api/v1/courses/%s/modules/%s", sch.Course.ID.Hex(), module.ID.Hex())
 	sbj := "Course Syndicate"
 
 	msg, err := utils.GenerateMailTemplate("template.html", &utils.MailTemplateData{
