@@ -32,3 +32,20 @@ type JWTClaims struct {
 
 // ContextKey ...
 type ContextKey string
+
+// SMTPServer ...
+type SMTPServer struct {
+	Host string
+	Port string
+}
+
+// MailTemplateData ...
+type MailTemplateData struct {
+	Username string
+	// Title    string
+	// CourseID    string
+	CourseTitle string
+	// ModuleID    string
+	ModuleTitle string
+	ModuleLink  string
+}

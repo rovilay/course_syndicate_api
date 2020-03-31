@@ -22,9 +22,19 @@ import (
 func NewCourseController(c *mongo.Client, config *root.MongoConfig) *CourseController {
 	courseService := db.NewService(c, config, "courses")
 	courseModuleService := db.NewService(c, config, "course_modules")
-	courseSubscriptionService := db.NewService(c, config, "course_subscriptions")
+	courseSubscriptionService := db.NewCourseSubService(c, config)
+	subscriptionScheduleService := db.NewService(c, config, "subscription_schedules")
+	host := utils.EnvOrDefaultString("SMTP_HOST", "smtp.gmail.com")
+	port := utils.EnvOrDefaultString("SMTP_PORT", "587")
+	smptService := &utils.SMTPServer{Host: host, Port: port}
 
-	return &CourseController{courseService, courseModuleService, courseSubscriptionService}
+	return &CourseController{
+		courseService,
+		courseModuleService,
+		courseSubscriptionService,
+		subscriptionScheduleService,
+		smptService,
+	}
 }
 
 // SeedCoursesData ...
@@ -144,62 +154,36 @@ func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.R
 
 	ctx := context.Background()
 	col := cc.courseService.Collection
-	var c *db.CourseModel
 
-	err = col.FindOne(ctx, bson.M{"_id": courseID}).Decode(&c)
+	matchStage := bson.M{"$match": bson.M{"_id": courseID}}
+	lookupStage := bson.M{"$lookup": bson.M{
+		"from":         "course_modules",
+		"localField":   "_id",
+		"foreignField": "courseId",
+		"as":           "modules",
+	}}
+
+	cur, err := col.Aggregate(ctx, []bson.M{matchStage, lookupStage})
 	if err != nil {
 		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
 
 		e.StatusCode = http.StatusInternalServerError
 		e.ErrorMessage = errors.New("something went wrong")
 
-		if c == nil {
-			e.StatusCode = http.StatusNotFound
-			e.ErrorMessage = errors.New("course not found")
-		}
-
 		utils.ErrorHandler(e, res)
 		return
 	}
 
-	// find course modules
-	mCol := cc.courseModuleService.Collection
-	var modules []*db.CourseModuleModel
-
-	cur, err := mCol.Find(ctx, bson.M{"courseId": c.ID})
-	if err := cur.Err(); err != nil {
+	var cwm []db.CourseWithModule
+	if err = cur.All(ctx, &cwm); err != nil {
 		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
 
 		utils.ErrorHandler(e, res)
 		return
 	}
 
-	for cur.Next(ctx) {
-		// create a value into which the single document can be decoded
-		var cm db.CourseModuleModel
-		err := cur.Decode(&cm)
-		if err != nil {
-			e.StatusCode = http.StatusInternalServerError
-			e.ErrorMessage = errors.New("something went wrong")
-
-			utils.ErrorHandler(e, res)
-			log.Fatalln("[ERROR: FETCH_COURSES]: ", err)
-		}
-
-		modules = append(modules, &cm)
-	}
-
-	result := &courseWithModule{
-		ID:              c.ID,
-		Title:           c.Title,
-		NumberOfModules: c.NumberOfModules,
-		Modules:         modules,
-		CreatedAt:       c.CreatedAt,
-	}
-
-	// Close the cursor once finished
 	cur.Close(ctx)
-	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &result})
+	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &cwm[0]})
 }
 
 // Subscribe ...
@@ -224,6 +208,7 @@ func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) 
 
 	newSubscription := db.CreateCourseSubscriptionModel(uid, c.ID, cs)
 
+	// create subscription
 	col := cc.courseSubscriptionService.Collection
 	s, err := col.InsertOne(context.Background(), newSubscription)
 	if err != nil {
@@ -233,12 +218,29 @@ func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	schedules := []interface{}{}
+	for _, schedule := range cs {
+		ns := db.CreateSubscriptionScheduleModel(newSubscription.ID, schedule)
+		schedules = append(schedules, *ns)
+	}
+
+	// create schedules
+	ssCol := cc.subscriptionScheduleService.Collection
+	_, err = ssCol.InsertMany(context.Background(), schedules)
+	if err != nil {
+		fmt.Println("[ERROR: COURSE_SUBSCRIPTION_HANDLER]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
 	result := &courseSubscription{
-		ID:        s.InsertedID.(primitive.ObjectID).Hex(),
-		UserID:    u.ID,
-		CourseID:  c.ID.Hex(),
-		Schedule:  cs,
-		CreatedAt: c.CreatedAt,
+		ID:               s.InsertedID.(primitive.ObjectID).Hex(),
+		UserID:           u.ID,
+		CourseID:         c.ID.Hex(),
+		ModulesCompleted: newSubscription.ModulesCompleted,
+		Schedule:         cs,
+		CreatedAt:        c.CreatedAt,
 	}
 
 	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", result})

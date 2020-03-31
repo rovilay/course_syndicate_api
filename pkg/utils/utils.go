@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"regexp"
 	"strconv"
@@ -200,4 +203,54 @@ func DateTimeStringSchedular(s, dateFormat string) ([]int64, error) {
 	}
 
 	return ts, nil
+}
+
+// Address URI to smtp server
+func (s *SMTPServer) Address() string {
+	return fmt.Sprintf("%s:%s", s.Host, s.Port)
+}
+
+// SendEmail ...
+func (s *SMTPServer) SendEmail(from, password, subject, message string, to []string) error {
+	mime := "MIME-version: 1.0;\nContent-Type: text/plain; charset=\"UTF-8\";\n\n"
+	sbj := fmt.Sprintf("Subject: %s \n", subject)
+	tpl := fmt.Sprintf("%s%s\n%s", sbj, mime, message)
+	msg := []byte(tpl)
+
+	// Authentication.
+	auth := smtp.PlainAuth("", from, password, s.Host)
+	// Sending email.
+	return smtp.SendMail(s.Address(), auth, from, to, msg)
+}
+
+// mailTemplate ...
+// const mailTemplate = `
+// 	<!DOCTYPE html>
+// 	<html>
+// 		<head>
+// 			<meta charset="UTF-8">
+// 			<title>{{.Title}}</title>
+// 		</head>
+// 		<body>
+// 			<h1>{{.CourseTitle}}</h1>
+// 			<h3>{{.ModuleTitle}}</h3>
+// 			Click <a href={{.ModuleLink}}>here</a> to access the module.
+// 		</body>
+// 	</html>
+// `
+
+// GenerateMailTemplate ...
+func GenerateMailTemplate(templateFileName string, data *MailTemplateData) (tpl string, err error) {
+	t, err := template.ParseFiles(templateFileName)
+	if err != nil {
+		return
+	}
+
+	buf := new(bytes.Buffer)
+	if err = t.Execute(buf, data); err != nil {
+		return
+	}
+
+	tpl = buf.String()
+	return
 }
