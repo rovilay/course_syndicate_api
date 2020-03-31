@@ -18,6 +18,7 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 
 	// attach handlers to subrouter
 	courseController := controllers.NewCourseController(c, config)
+	sc := controllers.NewScheduleController(c, config)
 	v := middlewares.NewValidator(c, config)
 
 	courseSubrouter.HandleFunc(
@@ -50,7 +51,7 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 		"/{id}/subscribe",
 		middlewares.Authenticate(
 			http.HandlerFunc(
-				http.HandlerFunc(courseController.FetchSubscriptions),
+				http.HandlerFunc(sc.SyncSchedules),
 			),
 		),
 	).Methods("GET")
