@@ -4,6 +4,7 @@ import (
 	"log"
 
 	root "course_syndicate_api/pkg"
+	"course_syndicate_api/pkg/controllers"
 	"course_syndicate_api/pkg/db"
 	"course_syndicate_api/pkg/server"
 	"course_syndicate_api/pkg/utils"
@@ -11,13 +12,15 @@ import (
 
 // App ...
 type App struct {
-	server *server.Server
-	client *db.Client
-	config *root.Config
+	server  *server.Server
+	client  *db.Client
+	config  *root.Config
+	sc      *controllers.ScheduleController
+	workers int
 }
 
 // Initialize ...
-func (a *App) Initialize() {
+func (a *App) initialize(workers int) {
 	a.config = &root.Config{
 		MongoConfig: &root.MongoConfig{
 			URL:    utils.EnvOrDefaultString("DB_URL", ""),
@@ -35,11 +38,13 @@ func (a *App) Initialize() {
 		log.Fatalln("[ERROR: CREATE MONGO CLIENT]", err)
 	}
 
+	a.workers = workers
+	a.sc = controllers.NewScheduleController(a.client.Copy(), a.config.MongoConfig)
 	a.server = server.InitServer(a.config, a.client)
 }
 
 // Start ...
-func (a *App) Start() {
+func (a *App) start() {
 	defer a.client.Close()
 	a.server.Start()
 }

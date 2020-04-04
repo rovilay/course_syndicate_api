@@ -7,7 +7,6 @@ import (
 	"course_syndicate_api/pkg/utils"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -15,6 +14,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+const (
+	defaultMailIntervalMins = 15
 )
 
 // NewScheduleController ...
@@ -33,13 +36,13 @@ func NewScheduleController(c *mongo.Client, config *root.MongoConfig) *ScheduleC
 }
 
 // FetchSchedules ...
-func (sc *ScheduleController) FetchSchedules() (subs []fetchSchedulesResult, err error) {
+func (sc *ScheduleController) fetchSchedules() (subs []fetchSchedulesResult, err error) {
 	const oneMillisecInNanosec = 1e6
 	const oneSecInMilliSec = 1000
 	now := time.Now().UnixNano() / oneMillisecInNanosec
 	sendMailIntervalMins, err := strconv.Atoi(utils.EnvOrDefaultString("SEND_MAIL_INTERVAL_MINS", "15"))
 	if err != nil {
-		sendMailIntervalMins = 15
+		sendMailIntervalMins = defaultMailIntervalMins
 	}
 	interval := sendMailIntervalMins * 60 * oneSecInMilliSec
 
@@ -47,10 +50,15 @@ func (sc *ScheduleController) FetchSchedules() (subs []fetchSchedulesResult, err
 	col := sc.subscriptionScheduleService.Collection
 
 	addFieldStage := bson.M{"$addFields": bson.M{
-		"timeDiff": bson.M{"$subtract": []interface{}{now, "$schedule"}},
 		"isMailReady": bson.M{"$and": []bson.M{
-			bson.M{"$gte": []interface{}{"$timeDiff", 0}},
-			bson.M{"$lte": []interface{}{"$timeDiff", interval}},
+			bson.M{"$gte": []interface{}{
+				bson.M{"$subtract": []interface{}{now, "$schedule"}},
+				0,
+			}},
+			bson.M{"$lte": []interface{}{
+				bson.M{"$subtract": []interface{}{now, "$schedule"}},
+				interval,
+			}},
 		}},
 	}}
 	matchStage := bson.M{"$match": bson.M{"isMailReady": true, "completed": false}}
@@ -191,15 +199,9 @@ func (sc *ScheduleController) psWorker(roc <-chan fetchSchedulesResult, wg *sync
 }
 
 // SyncSchedules ...
-func (sc *ScheduleController) SyncSchedules(res http.ResponseWriter, r *http.Request) {
-	e := &utils.ErrorWithStatusCode{
-		StatusCode:   http.StatusInternalServerError,
-		ErrorMessage: errors.New("fetch failed"),
-	}
-
-	schdls, err := sc.FetchSchedules()
+func (sc *ScheduleController) syncSchedules() (err error) {
+	schdls, err := sc.fetchSchedules()
 	if err != nil {
-		utils.ErrorHandler(e, res)
 		return
 	}
 
@@ -207,10 +209,7 @@ func (sc *ScheduleController) SyncSchedules(res http.ResponseWriter, r *http.Req
 	password := utils.EnvOrDefaultString("SMTP_EMAIL_PASSWORD", "")
 
 	if from == "" || password == "" {
-		e.ErrorMessage = errors.New("SMTP_EMAIL and SMTP_EMAIL_PASSWORD not provided")
-
-		utils.ErrorHandler(e, res)
-		return
+		return errors.New("SMTP_EMAIL and SMTP_EMAIL_PASSWORD not provided")
 	}
 
 	wg := sync.WaitGroup{}
@@ -231,6 +230,28 @@ func (sc *ScheduleController) SyncSchedules(res http.ResponseWriter, r *http.Req
 
 	wg.Wait()
 
-	utils.JSONResponseHandler(res, http.StatusOK, &genericResponse{"operation successful"})
 	return
+}
+
+// SyncSchedulesWorker ...
+func (sc *ScheduleController) SyncSchedulesWorker() {
+	fmt.Println("SyncSchedulesWorker is running...")
+	sendMailIntervalMins, err := strconv.Atoi(utils.EnvOrDefaultString("SEND_MAIL_INTERVAL_MINS", "15"))
+	if err != nil {
+		sendMailIntervalMins = defaultMailIntervalMins
+	}
+
+	duration, _ := time.ParseDuration(fmt.Sprintf("%dm", sendMailIntervalMins))
+
+	for {
+		time.Sleep(duration)
+		fmt.Println("Starting another schedules sync...")
+		err := sc.syncSchedules()
+
+		if err != nil {
+			fmt.Println("[ERROR: SyncSchedulesWorker]: ", err)
+
+			panic(err)
+		}
+	}
 }
