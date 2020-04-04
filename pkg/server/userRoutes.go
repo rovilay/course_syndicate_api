@@ -29,13 +29,4 @@ func NewUserRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 		"/login",
 		v.ValidateUserLogin(http.HandlerFunc(userController.LoginUserHandler)),
 	).Methods("POST")
-
-	userSubrouter.HandleFunc(
-		"/auth-test",
-		middlewares.Authenticate(
-			http.HandlerFunc(
-				v.ValidateUserExist(http.HandlerFunc(userController.DummyController)),
-			),
-		),
-	).Methods("GET")
 }

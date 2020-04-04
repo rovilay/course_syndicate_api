@@ -11,6 +11,7 @@ import (
 	"net/smtp"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -120,13 +121,13 @@ func Schedular(s, dateFormat string, numberOfSchedule int) (ts []int64, err erro
 func TimeframeSchedular(s string, numberOfSchedule int) ([]int64, error) {
 	var ts []int64
 	re := regexp.MustCompile("^(every)[ ](0?[1-9]([0-9]{1,})?)[ ]((day|week|month)s?)$")
-
-	if !re.MatchString(s) {
+	ns := strings.TrimSpace(s)
+	if !re.MatchString(ns) {
 		err := errors.New("invalid string")
 		return ts, err
 	}
 
-	sArr := strings.Split(strings.ToLower(s), " ")
+	sArr := strings.Split(strings.ToLower(ns), " ")
 
 	scheduleNumber, err := strconv.Atoi(sArr[1])
 	if err != nil {
@@ -138,7 +139,8 @@ func TimeframeSchedular(s string, numberOfSchedule int) ([]int64, error) {
 	for num := 0; num < numberOfSchedule; num++ {
 		if num == 0 {
 			// convert date to milliseconds
-			tMilliSec := now.UnixNano() / oneMillisecInNanosec
+			// add 1 min to the first schedule to prevent clash with the schedular
+			tMilliSec := now.Add(1*time.Minute).UnixNano() / oneMillisecInNanosec
 			ts = append(ts, tMilliSec)
 			continue
 		}
@@ -184,7 +186,10 @@ func DateTimeStringSchedular(s, dateFormat string) ([]int64, error) {
 	}
 
 	for _, val := range sArr {
-		t, err := time.Parse(dateFormat, val)
+		loc, _ := time.LoadLocation("Africa/Lagos")
+
+		t, err := time.ParseInLocation(dateFormat, strings.TrimSpace(val), loc)
+		// t, err := time.Parse(dateFormat, strings.TrimSpace(val))
 		if err != nil {
 			return ts, fmt.Errorf("invalid string")
 		}
@@ -201,6 +206,15 @@ func DateTimeStringSchedular(s, dateFormat string) ([]int64, error) {
 
 		ts = append(ts, tMillisec)
 	}
+
+	// sort ts in ascending order
+	sort.SliceStable(ts, func(i, j int) bool {
+		return ts[i] < ts[j]
+	})
+
+	// add 1 min to the first schedule to prevent clash with the schedular
+	const oneMinInMillisec = 60000
+	ts[0] = ts[0] + (1 * oneMinInMillisec)
 
 	return ts, nil
 }
@@ -222,22 +236,6 @@ func (s *SMTPServer) SendEmail(from, password, subject, message string, to []str
 	// Sending email.
 	return smtp.SendMail(s.Address(), auth, from, to, msg)
 }
-
-// mailTemplate ...
-// const mailTemplate = `
-// 	<!DOCTYPE html>
-// 	<html>
-// 		<head>
-// 			<meta charset="UTF-8">
-// 			<title>{{.Title}}</title>
-// 		</head>
-// 		<body>
-// 			<h1>{{.CourseTitle}}</h1>
-// 			<h3>{{.ModuleTitle}}</h3>
-// 			Click <a href={{.ModuleLink}}>here</a> to access the module.
-// 		</body>
-// 	</html>
-// `
 
 // GenerateMailTemplate ...
 func GenerateMailTemplate(templateFileName string, data *MailTemplateData) (tpl string, err error) {
