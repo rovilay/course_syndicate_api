@@ -7,7 +7,6 @@ import (
 	"course_syndicate_api/pkg/utils"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -255,21 +254,4 @@ func (sc *ScheduleController) SyncSchedulesWorker() {
 			panic(err)
 		}
 	}
-}
-
-// SySchedules ...
-func (sc *ScheduleController) SySchedules(res http.ResponseWriter, r *http.Request) {
-	e := &utils.ErrorWithStatusCode{
-		StatusCode:   http.StatusInternalServerError,
-		ErrorMessage: errors.New("fetch failed"),
-	}
-
-	schdls, err := sc.fetchSchedules()
-	if err != nil {
-		utils.ErrorHandler(e, res)
-		return
-	}
-
-	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &schdls})
-	return
 }
