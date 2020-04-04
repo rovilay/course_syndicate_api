@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"sync"
 
 	root "course_syndicate_api/pkg"
 	"course_syndicate_api/pkg/controllers"
@@ -45,7 +44,7 @@ func (a *App) initialize(workers int) {
 }
 
 // Start ...
-func (a *App) start(wg *sync.WaitGroup) {
+func (a *App) start() {
 	defer a.client.Close()
 	a.server.Start()
 }

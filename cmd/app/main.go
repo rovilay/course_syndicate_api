@@ -7,11 +7,11 @@ func main() {
 	app := App{}
 	app.initialize(1)
 
-	wg.Add(2)
+	wg.Add(2) // 2 is the number of go routines
 
 	go func() {
 		defer wg.Done()
-		app.start(&wg)
+		app.start()
 	}()
 
 	go func() {
