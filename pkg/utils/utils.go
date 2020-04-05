@@ -23,10 +23,15 @@ import (
 // EnvOrDefaultString ...
 func EnvOrDefaultString(envVar string, defaultValue string) string {
 	// load .env file
-	err := godotenv.Load(".env")
 
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
+	fmt.Println(os.Getenv("APP_ENV"), "----")
+
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load(".env")
+
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
 	}
 
 	value := os.Getenv(envVar)
