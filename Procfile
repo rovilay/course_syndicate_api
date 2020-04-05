@@ -1,1 +1,1 @@
-web: bin/course_syndicate_api
+web: bin/app
