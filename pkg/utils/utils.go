@@ -22,12 +22,9 @@ import (
 
 // EnvOrDefaultString ...
 func EnvOrDefaultString(envVar string, defaultValue string) string {
-	// load .env file
-
-	fmt.Println(os.Getenv("APP_ENV"), "----")
-	fmt.Println(os.Getenv("PORT"), "---PORT-")
-
-	if os.Getenv("APP_ENV") == "dev" {
+	env := os.Getenv("APP_ENV")
+	// load .env file only in dev and test env
+	if env == "dev" || env == "test" {
 		err := godotenv.Load(".env")
 
 		if err != nil {
