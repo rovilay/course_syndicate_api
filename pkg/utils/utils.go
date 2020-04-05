@@ -25,8 +25,9 @@ func EnvOrDefaultString(envVar string, defaultValue string) string {
 	// load .env file
 
 	fmt.Println(os.Getenv("APP_ENV"), "----")
+	fmt.Println(os.Getenv("PORT"), "---PORT-")
 
-	if os.Getenv("APP_ENV") != "production" {
+	if os.Getenv("APP_ENV") == "dev" {
 		err := godotenv.Load(".env")
 
 		if err != nil {
