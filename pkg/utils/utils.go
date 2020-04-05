@@ -22,11 +22,14 @@ import (
 
 // EnvOrDefaultString ...
 func EnvOrDefaultString(envVar string, defaultValue string) string {
-	// load .env file
-	err := godotenv.Load(".env")
+	env := os.Getenv("APP_ENV")
+	// load .env file only in dev and test env
+	if env == "dev" || env == "test" {
+		err := godotenv.Load(".env")
 
-	if err != nil {
-		log.Fatalf("Error loading .env file")
+		if err != nil {
+			log.Fatalf("Error loading .env file: %v", err)
+		}
 	}
 
 	value := os.Getenv(envVar)
@@ -40,7 +43,7 @@ func EnvOrDefaultString(envVar string, defaultValue string) string {
 
 // ErrorHandler handles https error responses
 func ErrorHandler(err *ErrorWithStatusCode, res http.ResponseWriter) {
-	// log.Fatal(err.ErrorMessage.Error())
+	// log.Fatal(err.ErrorMessage.Error())-
 	res.Header().Set("Content-Type", "application/json")
 
 	e, _ := json.Marshal(ErrorResponse{
