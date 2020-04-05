@@ -27,7 +27,7 @@ func (a *App) initialize(workers int) {
 			DBName: utils.EnvOrDefaultString("DB_NAME", "course_syndicate"),
 		},
 		ServerConfig: &root.ServerConfig{
-			Port: utils.EnvOrDefaultString("PORT", ":4444"),
+			Port: utils.EnvOrDefaultString("PORT", "4444"),
 		},
 	}
 

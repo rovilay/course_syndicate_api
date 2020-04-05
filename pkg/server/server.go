@@ -59,7 +59,7 @@ func welcomeHandler(res http.ResponseWriter, r *http.Request) {
 func (s *Server) Start() {
 	fmt.Println("Listening on port " + s.config.Port)
 	loggedRouter := handlers.LoggingHandler(os.Stdout, s.route)
-	err := http.ListenAndServe(s.config.Port, loggedRouter)
+	err := http.ListenAndServe(":"+s.config.Port, loggedRouter)
 	if err != nil {
 		log.Fatalln("httpListenAndServe: ", err)
 	}
