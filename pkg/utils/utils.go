@@ -26,7 +26,7 @@ func EnvOrDefaultString(envVar string, defaultValue string) string {
 	err := godotenv.Load(".env")
 
 	if err != nil {
-		log.Fatalf("Error loading .env file")
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	value := os.Getenv(envVar)
@@ -40,7 +40,7 @@ func EnvOrDefaultString(envVar string, defaultValue string) string {
 
 // ErrorHandler handles https error responses
 func ErrorHandler(err *ErrorWithStatusCode, res http.ResponseWriter) {
-	// log.Fatal(err.ErrorMessage.Error())
+	// log.Fatal(err.ErrorMessage.Error())-
 	res.Header().Set("Content-Type", "application/json")
 
 	e, _ := json.Marshal(ErrorResponse{
