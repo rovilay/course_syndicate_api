@@ -77,6 +77,14 @@ type fetchSchedulesResult struct {
 	CreatedAt     time.Time               `json:"createdAt" bson:"createdAt"`
 }
 
+type fetchModuleResult struct {
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id, omitempty"`
+	Title     string             `json:"title" bson:"title"`
+	CourseID  primitive.ObjectID `json:"courseId" bson:"courseId"`
+	Course    scheduleCourse     `json:"course" bson:"course"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
+}
+
 // authResponse ...
 type authResponse struct {
 	Token string `json:"token,omitempty"`
