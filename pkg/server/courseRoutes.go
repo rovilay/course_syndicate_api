@@ -45,4 +45,14 @@ func NewCourseRouter(r *mux.Router, c *mongo.Client, config *root.MongoConfig) {
 			),
 		),
 	).Methods("POST")
+
+	courseSubrouter.HandleFunc(
+		"/{id}/modules/{moduleId}",
+		middlewares.Authenticate(
+			http.HandlerFunc(
+				v.ValidateCourseExist(
+					http.HandlerFunc(courseController.FetchSingleModule),
+				),
+			)),
+	).Methods("GET")
 }

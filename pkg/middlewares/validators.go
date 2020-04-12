@@ -367,3 +367,32 @@ func (v *Validator) ValidateCourseSubscription(next http.Handler) func(http.Resp
 		return
 	}
 }
+
+// ValidateCourseExist ...
+func (v *Validator) ValidateCourseExist(next http.Handler) func(http.ResponseWriter, *http.Request) {
+	return func(res http.ResponseWriter, req *http.Request) {
+		e := &utils.ErrorWithStatusCode{
+			StatusCode:   http.StatusInternalServerError,
+			ErrorMessage: errors.New("something went wrong"),
+		}
+
+		params := mux.Vars(req)
+		courseID, err := primitive.ObjectIDFromHex(params["id"])
+
+		c, err := v.CheckCourseExist(courseID)
+
+		if err != nil {
+			e.StatusCode = http.StatusNotFound
+			e.ErrorMessage = err
+
+			utils.ErrorHandler(e, res)
+			return
+		}
+
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, utils.ContextKey("verifiedCourse"), c)
+		req = req.WithContext(ctx)
+		next.ServeHTTP(res, req)
+		return
+	}
+}

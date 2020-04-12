@@ -38,7 +38,7 @@ func NewCourseController(c *mongo.Client, config *root.MongoConfig) *CourseContr
 }
 
 // SeedCoursesData ...
-func (cc *CourseController) SeedCoursesData(res http.ResponseWriter, r *http.Request) {
+func (cc *CourseController) SeedCoursesData(res http.ResponseWriter, req *http.Request) {
 	e := &utils.ErrorWithStatusCode{
 		StatusCode:   http.StatusInternalServerError,
 		ErrorMessage: errors.New("course seed failed"),
@@ -86,7 +86,7 @@ func (cc *CourseController) SeedCoursesData(res http.ResponseWriter, r *http.Req
 }
 
 // FetchCourses ...
-func (cc *CourseController) FetchCourses(res http.ResponseWriter, r *http.Request) {
+func (cc *CourseController) FetchCourses(res http.ResponseWriter, req *http.Request) {
 	e := &utils.ErrorWithStatusCode{
 		StatusCode:   http.StatusInternalServerError,
 		ErrorMessage: errors.New("fetch failed"),
@@ -133,17 +133,17 @@ func (cc *CourseController) FetchCourses(res http.ResponseWriter, r *http.Reques
 }
 
 // FetchSingleCourse ....
-func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.Request) {
+func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, req *http.Request) {
 	e := &utils.ErrorWithStatusCode{
 		StatusCode:   http.StatusInternalServerError,
 		ErrorMessage: errors.New("fetch failed"),
 	}
 
-	params := mux.Vars(r)
+	params := mux.Vars(req)
 	courseID, err := primitive.ObjectIDFromHex(params["id"])
 
 	if err != nil {
-		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
+		fmt.Println("[ERROR: FETCH_SINGLE_COURSE]: ", err)
 
 		e.StatusCode = http.StatusBadRequest
 		e.ErrorMessage = errors.New("invalid course id")
@@ -165,7 +165,7 @@ func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.R
 
 	cur, err := col.Aggregate(ctx, []bson.M{matchStage, lookupStage})
 	if err != nil {
-		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
+		fmt.Println("[ERROR: FETCH_SINGLE_COURSE]: ", err)
 
 		e.StatusCode = http.StatusInternalServerError
 		e.ErrorMessage = errors.New("something went wrong")
@@ -176,7 +176,7 @@ func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.R
 
 	var cwm []db.CourseWithModule
 	if err = cur.All(ctx, &cwm); err != nil {
-		fmt.Println("[ERROR: FETCH_COURSES]: ", err)
+		fmt.Println("[ERROR: FETCH_SINGLE_COURSE]: ", err)
 
 		utils.ErrorHandler(e, res)
 		return
@@ -187,13 +187,13 @@ func (cc *CourseController) FetchSingleCourse(res http.ResponseWriter, r *http.R
 }
 
 // Subscribe ...
-func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) {
+func (cc *CourseController) Subscribe(res http.ResponseWriter, req *http.Request) {
 	e := &utils.ErrorWithStatusCode{
 		StatusCode:   http.StatusInternalServerError,
 		ErrorMessage: errors.New("Something went wrong"),
 	}
 
-	ctx := r.Context()
+	ctx := req.Context()
 	u := ctx.Value(utils.ContextKey("claims")).(utils.JWTClaims)
 	c := ctx.Value(utils.ContextKey("verifiedCourse")).(db.CourseModel)
 	cs := ctx.Value(utils.ContextKey("verifiedSchedule")).([]int64)
@@ -244,4 +244,76 @@ func (cc *CourseController) Subscribe(res http.ResponseWriter, r *http.Request) 
 	}
 
 	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", result})
+}
+
+// FetchSingleModule ...
+func (cc *CourseController) FetchSingleModule(res http.ResponseWriter, req *http.Request) {
+	e := &utils.ErrorWithStatusCode{
+		StatusCode:   http.StatusInternalServerError,
+		ErrorMessage: errors.New("fetch failed"),
+	}
+
+	params := mux.Vars(req)
+
+	courseID, err := primitive.ObjectIDFromHex(params["id"])
+	moduleID, err := primitive.ObjectIDFromHex(params["moduleId"])
+
+	if err != nil {
+		fmt.Println("[ERROR: FETCH_COURSE_MODULE]: ", err)
+
+		e.StatusCode = http.StatusBadRequest
+		e.ErrorMessage = errors.New("invalid module id")
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	ctx := context.Background()
+	col := cc.courseModuleService.Collection
+
+	matchStage := bson.M{"$match": bson.M{"_id": moduleID, "courseId": courseID}}
+	lookupStage := bson.M{"$lookup": bson.M{
+		"from":         "courses",
+		"localField":   "courseId",
+		"foreignField": "_id",
+		"as":           "course",
+	}}
+	unwindStage := bson.M{"$unwind": bson.M{
+		"path":                       "$course",
+		"preserveNullAndEmptyArrays": true,
+	}}
+
+	cur, err := col.Aggregate(ctx, []bson.M{
+		matchStage,
+		lookupStage,
+		unwindStage,
+	})
+
+	if err != nil {
+		fmt.Println("[ERROR: FETCH_COURSE_MODULE]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	var results []fetchModuleResult
+	
+	if err = cur.All(ctx, &results); err != nil {
+		fmt.Println("[ERROR: FETCH_COURSE_MODULE]: ", err)
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	if len(results) < 1 {
+		e.StatusCode = http.StatusNotFound
+		e.ErrorMessage = errors.New("module not found")
+
+		utils.ErrorHandler(e, res)
+		return
+	}
+
+	// Close the cursor once finished
+	cur.Close(ctx)
+	utils.JSONResponseHandler(res, http.StatusOK, &genericResponseWithData{"operation successful", &results[0]})
 }
